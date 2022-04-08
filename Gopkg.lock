@@ -114,7 +114,7 @@
 
 [[projects]]
   digest = "1:c706e6cf1803e8cbce88ad1159c8750ec0dacbeac7c3906e615af69c0c1d6281"
-  name = "github.com/percona/exporter_shared"
+  name = "github.com/shatteredsilicon/exporter_shared"
   packages = ["helpers"]
   pruneopts = "NUT"
   revision = "074d05bfecbb11bfbb09cd29fd718c9c4a1d2e64"
@@ -232,7 +232,7 @@
     "github.com/aws/aws-sdk-go/service/cloudwatch",
     "github.com/aws/aws-sdk-go/service/cloudwatchlogs",
     "github.com/aws/aws-sdk-go/service/rds",
-    "github.com/percona/exporter_shared/helpers",
+    "github.com/shatteredsilicon/exporter_shared/helpers",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/common/log",

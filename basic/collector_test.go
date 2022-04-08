@@ -3,14 +3,14 @@ package basic
 import (
 	"testing"
 
-	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/shatteredsilicon/exporter_shared/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/percona/rds_exporter/client"
-	"github.com/percona/rds_exporter/config"
-	"github.com/percona/rds_exporter/sessions"
+	"github.com/shatteredsilicon/rds_exporter/client"
+	"github.com/shatteredsilicon/rds_exporter/config"
+	"github.com/shatteredsilicon/rds_exporter/sessions"
 )
 
 func getCollector(t *testing.T) *Collector {

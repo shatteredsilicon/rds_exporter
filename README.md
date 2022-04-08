@@ -1,6 +1,6 @@
 # RDS Exporter
 
-[![Release](https://img.shields.io/github/release/percona/rds_exporter.svg?style=flat)](https://github.com/percona/rds_exporter/releases/latest)
+[![Release](https://img.shields.io/github/release/percona/rds_exporter.svg?style=flat)](https://github.com/shatteredsilicon/rds_exporter/releases/latest)
 [![Build Status](https://travis-ci.com/percona/rds_exporter.svg?branch=master)](https://travis-ci.com/percona/rds_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/rds_exporter)](https://goreportcard.com/report/github.com/percona/rds_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/rds_exporter)](https://cla-assistant.percona.com/percona/rds_exporter)
