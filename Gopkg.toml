@@ -1,4 +1,30 @@
+required = ['github.com/cespare/xxhash']
+
+ignored = [
+  'github.com/cespare/xxhash/v2'
+]
+
 [prune]
   go-tests = true
   non-go = true
   unused-packages = true
+
+[[constraint]]
+  name = 'github.com/cespare/xxhash'
+  version = "^2.1.2"
+
+[[override]]
+  name = 'github.com/aws/aws-sdk-go'
+  version = "^v1.44.44"
+
+[[override]]
+  name = 'github.com/prometheus/client_golang'
+  version = "~v1.11.1"
+
+[[override]]
+  name = 'github.com/prometheus/client_model'
+  version = "~v0.2.0"
+
+[[override]]
+  name = 'github.com/prometheus/common'
+  version = "~v0.26.0"
