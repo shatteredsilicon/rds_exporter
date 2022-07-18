@@ -22,7 +22,7 @@ type Collector struct {
 
 // Maximal and minimal metrics update interval.
 const (
-	maxInterval = 10 * time.Second
+	maxInterval = 60 * time.Second
 	minInterval = 2 * time.Second
 )
 
@@ -49,7 +49,8 @@ func NewCollector(sessions *sessions.Sessions) *Collector {
 		s.logger.Infof("Updating enhanced metrics every %s.", interval)
 
 		// perform first scrapes synchronously so returned collector has all metric descriptions
-		c.setMetrics(s.scrape(context.TODO()))
+		m, _ := s.scrape(context.TODO())
+		c.setMetrics(m)
 
 		ch := make(chan map[string][]prometheus.Metric)
 		go func() {

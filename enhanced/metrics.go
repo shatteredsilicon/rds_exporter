@@ -1,6 +1,7 @@
 package enhanced
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -36,6 +37,9 @@ type osMetrics struct {
 	ProcessList       []processList     `json:"processList"`
 	Swap              swap              `json:"swap"`
 	Tasks             tasks             `json:"tasks"`
+
+	// TODO Handle this: https://jira.percona.com/browse/PMM-3835
+	PhysicalDeviceIO []diskIO `json:"physicalDeviceIO"`
 }
 
 type cpuUtilization struct {
@@ -98,22 +102,22 @@ type loadAverageMinute struct {
 
 //nolint:lll
 type memory struct {
-	Active         int `json:"active"         node:"Active"          m:"1024" help:"The amount of assigned memory, in kilobytes."`
-	Buffers        int `json:"buffers"        node:"Buffers"         m:"1024" help:"The amount of memory used for buffering I/O requests prior to writing to the storage device, in kilobytes."`
-	Cached         int `json:"cached"         node:"Cached"          m:"1024" help:"The amount of memory used for caching file system–based I/O."`
-	Dirty          int `json:"dirty"          node:"Dirty"           m:"1024" help:"The amount of memory pages in RAM that have been modified but not written to their related data block in storage, in kilobytes."`
-	Free           int `json:"free"           node:"MemFree"         m:"1024" help:"The amount of unassigned memory, in kilobytes."`
-	HugePagesFree  int `json:"hugePagesFree"  node:"HugePages_Free"  m:"1"    help:"The number of free huge pages. Huge pages are a feature of the Linux kernel."`
-	HugePagesRsvd  int `json:"hugePagesRsvd"  node:"HugePages_Rsvd"  m:"1"    help:"The number of committed huge pages."`
-	HugePagesSize  int `json:"hugePagesSize"  node:"Hugepagesize"    m:"1024" help:"The size for each huge pages unit, in kilobytes."`
-	HugePagesSurp  int `json:"hugePagesSurp"  node:"HugePages_Surp"  m:"1"    help:"The number of available surplus huge pages over the total."`
-	HugePagesTotal int `json:"hugePagesTotal" node:"HugePages_Total" m:"1"    help:"The total number of huge pages for the system."`
-	Inactive       int `json:"inactive"       node:"Inactive"        m:"1024" help:"The amount of least-frequently used memory pages, in kilobytes."`
-	Mapped         int `json:"mapped"         node:"Mapped"          m:"1024" help:"The total amount of file-system contents that is memory mapped inside a process address space, in kilobytes."`
-	PageTables     int `json:"pageTables"     node:"PageTables"      m:"1024" help:"The amount of memory used by page tables, in kilobytes."`
-	Slab           int `json:"slab"           node:"Slab"            m:"1024" help:"The amount of reusable kernel data structures, in kilobytes."`
-	Total          int `json:"total"          node:"MemTotal"        m:"1024" help:"The total amount of memory, in kilobytes."`
-	Writeback      int `json:"writeback"      node:"Writeback"       m:"1024" help:"The amount of dirty pages in RAM that are still being written to the backing storage, in kilobytes."`
+	Active         int `json:"active"         node:"Active"       m:"1024" help:"The amount of assigned memory, in kilobytes."`
+	Buffers        int `json:"buffers"        node:"Buffers"      m:"1024" help:"The amount of memory used for buffering I/O requests prior to writing to the storage device, in kilobytes."`
+	Cached         int `json:"cached"         node:"Cached"       m:"1024" help:"The amount of memory used for caching file system–based I/O."`
+	Dirty          int `json:"dirty"          node:"Dirty"        m:"1024" help:"The amount of memory pages in RAM that have been modified but not written to their related data block in storage, in kilobytes."`
+	Free           int `json:"free"           node:"MemFree"      m:"1024" help:"The amount of unassigned memory, in kilobytes."`
+	HugePagesFree  int `json:"hugePagesFree"  node:"HugePages_Free"     m:"1"    help:"The number of free huge pages. Huge pages are a feature of the Linux kernel."`
+	HugePagesRsvd  int `json:"hugePagesRsvd"  node:"HugePages_Rsvd"     m:"1"    help:"The number of committed huge pages."`
+	HugePagesSize  int `json:"hugePagesSize"  node:"Hugepagesize" m:"1024" help:"The size for each huge pages unit, in kilobytes."`
+	HugePagesSurp  int `json:"hugePagesSurp"  node:"HugePages_Surp"     m:"1"    help:"The number of available surplus huge pages over the total."`
+	HugePagesTotal int `json:"hugePagesTotal" node:"HugePages_Total"    m:"1"    help:"The total number of huge pages for the system."`
+	Inactive       int `json:"inactive"       node:"Inactive"     m:"1024" help:"The amount of least-frequently used memory pages, in kilobytes."`
+	Mapped         int `json:"mapped"         node:"Mapped"       m:"1024" help:"The total amount of file-system contents that is memory mapped inside a process address space, in kilobytes."`
+	PageTables     int `json:"pageTables"     node:"PageTables"   m:"1024" help:"The amount of memory used by page tables, in kilobytes."`
+	Slab           int `json:"slab"           node:"Slab"         m:"1024" help:"The amount of reusable kernel data structures, in kilobytes."`
+	Total          int `json:"total"          node:"MemTotal"     m:"1024" help:"The total amount of memory, in kilobytes."`
+	Writeback      int `json:"writeback"      node:"Writeback"    m:"1024" help:"The amount of dirty pages in RAM that are still being written to the backing storage, in kilobytes."`
 }
 
 type network struct {
@@ -132,6 +136,9 @@ type processList struct {
 	RSS          int     `json:"rss"          help:"The amount of RAM allocated to the process, in kilobytes."`
 	TGID         int     `json:"tgid"         help:"The thread group identifier, which is a number representing the process ID to which a thread belongs. This identifier is used to group threads from the same process."`
 	VSS          int     `json:"vss"          help:"The amount of virtual memory allocated to the process, in kilobytes."`
+
+	// TODO Handle this: https://jira.percona.com/browse/PMM-5150
+	VMLimit interface{} `json:"vmlimit" help:"-"`
 }
 
 //nolint:lll
@@ -155,9 +162,14 @@ type tasks struct {
 }
 
 // parseOSMetrics parses OS metrics from given JSON data.
-func parseOSMetrics(b []byte) (*osMetrics, error) {
+func parseOSMetrics(b []byte, disallowUnknownFields bool) (*osMetrics, error) {
+	d := json.NewDecoder(bytes.NewReader(b))
+	if disallowUnknownFields {
+		d.DisallowUnknownFields()
+	}
+
 	var m osMetrics
-	if err := json.Unmarshal(b, &m); err != nil {
+	if err := d.Decode(&m); err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -180,7 +192,7 @@ func makeGauge(desc *prometheus.Desc, labelValues []string, value reflect.Value)
 	case reflect.Int, reflect.Int64:
 		f = float64(value.Int())
 	default:
-		panic(fmt.Errorf("can't make a metric value from %v (%s)", value, kind))
+		panic(fmt.Errorf("can't make a metric value for %s from %v (%s)", desc, value, kind))
 	}
 
 	return prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, f, labelValues...)
@@ -384,6 +396,10 @@ func makeRDSProcessListMetrics(s *processList, constLabels prometheus.Labels) []
 	for i := 0; i < t.NumField(); i++ {
 		tags := t.Field(i).Tag
 		name, help := tags.Get("json"), tags.Get("help")
+		if help == "-" {
+			continue
+		}
+
 		switch name {
 		case "name", "id", "parentID", "tgid":
 			continue
@@ -449,6 +465,8 @@ func (m *osMetrics) makePrometheusMetrics(region string, labels map[string]strin
 		prometheus.CounterValue,
 		float64(m.Timestamp.Unix()),
 	))
+
+	// TODO Parse uptime: https://jira.percona.com/browse/PMM-2131
 
 	res = append(res, prometheus.MustNewConstMetric(
 		prometheus.NewDesc("rdsosmetrics_General_numVCPUs", "The number of virtual CPUs for the DB instance.", nil, constLabels),

@@ -21,7 +21,7 @@
   revision = "f65c72e2690dc4b403c8bd637baf4611cd4c069b"
 
 [[projects]]
-  digest = "1:1a3e3cc77a6785d6bd4f16bde7daff384262ff005cc02dc6262b5743cceab08a"
+  digest = "1:80273c81e21685ed13f84ca50829937edb331b7488ee8527439cd5dbb0364300"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -34,7 +34,6 @@
     "aws/credentials/ec2rolecreds",
     "aws/credentials/endpointcreds",
     "aws/credentials/processcreds",
-    "aws/credentials/ssocreds",
     "aws/credentials/stscreds",
     "aws/csm",
     "aws/defaults",
@@ -44,7 +43,6 @@
     "aws/session",
     "aws/signer/v4",
     "internal/context",
-    "internal/encoding/gzip",
     "internal/ini",
     "internal/sdkio",
     "internal/sdkmath",
@@ -59,19 +57,16 @@
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
-    "private/protocol/restjson",
     "private/protocol/xml/xmlutil",
     "service/cloudwatch",
     "service/cloudwatchlogs",
     "service/rds",
-    "service/sso",
-    "service/sso/ssoiface",
     "service/sts",
     "service/sts/stsiface",
   ]
   pruneopts = "NUT"
-  revision = "4f0bc23ad379b199b41670feae94b026a90e64cb"
-  version = "v1.44.44"
+  revision = "86719c20307e292b4ef817b15b52a5403e45905b"
+  version = "v1.36.33"
 
 [[projects]]
   digest = "1:707ebe952a8b3d00b343c01536c79c73771d100f63ec6babeaed5c79e2b8a8dd"
@@ -189,12 +184,12 @@
   version = "v0.0.8"
 
 [[projects]]
-  digest = "1:c706e6cf1803e8cbce88ad1159c8750ec0dacbeac7c3906e615af69c0c1d6281"
+  branch = "master"
+  digest = "1:16379f2653feea4834bd3700b27e2e0058d7bb7b1a708ac2904c92b9a7939581"
   name = "github.com/shatteredsilicon/exporter_shared"
   packages = ["helpers"]
   pruneopts = "NUT"
-  revision = "074d05bfecbb11bfbb09cd29fd718c9c4a1d2e64"
-  version = "v0.6.0"
+  revision = "8555cdbac68bfd9aeb94c6dd6ac965767667b950"
 
 [[projects]]
   digest = "1:f4aaa07a6c33f2b354726d0571acbc8ca118837c75709f6353203ae1a3f8eeab"
@@ -250,6 +245,7 @@
   input-imports = [
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/credentials",
+    "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/cloudwatch",
     "github.com/aws/aws-sdk-go/service/cloudwatchlogs",

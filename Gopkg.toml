@@ -15,7 +15,7 @@ ignored = [
 
 [[override]]
   name = 'github.com/aws/aws-sdk-go'
-  version = "^v1.44.44"
+  version = "~v1.36.30"
 
 [[override]]
   name = 'github.com/prometheus/client_golang'
@@ -28,3 +28,7 @@ ignored = [
 [[override]]
   name = 'github.com/prometheus/common'
   version = "~v0.26.0"
+
+[[override]]
+  name = "github.com/shatteredsilicon/exporter_shared"
+  branch = "master"
