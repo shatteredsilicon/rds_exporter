@@ -1,9 +1,11 @@
 package basic
 
 import (
+	"fmt"
+	"sort"
+	"strings"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shatteredsilicon/exporter_shared/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,47 +15,78 @@ import (
 	"github.com/shatteredsilicon/rds_exporter/sessions"
 )
 
-func getCollector(t *testing.T) *Collector {
-	t.Helper()
-
-	cfg, err := config.Load("../config.yml")
+func TestCollector(t *testing.T) {
+	cfg, err := config.Load("../config.tests.yml")
 	require.NoError(t, err)
 	client := client.New()
 	sess, err := sessions.New(cfg.Instances, client.HTTP(), false)
 	require.NoError(t, err)
-	return New(cfg, sess)
-}
 
-func TestCollector_Describe(t *testing.T) {
-	c := getCollector(t)
-	ch := make(chan *prometheus.Desc)
-	go func() {
-		c.Describe(ch)
-		close(ch)
-	}()
+	c := New(cfg, sess)
 
-	const expected = 50
-	descs := make([]*prometheus.Desc, 0, expected)
-	for d := range ch {
-		descs = append(descs, d)
+	actualMetrics := helpers.ReadMetrics(helpers.CollectMetrics(c))
+	sort.Slice(actualMetrics, func(i, j int) bool { return actualMetrics[i].Less(actualMetrics[j]) })
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	if *goldenTXT {
+		writeTestDataMetrics(t, actualLines)
 	}
 
-	assert.Equal(t, expected, len(descs), "%+v", descs)
+	for _, m := range actualMetrics {
+		m.Value = 0
+	}
+	actualLines = helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	expectedMetrics := helpers.ReadMetrics(helpers.Parse(readTestDataMetrics(t)))
+	sort.Slice(expectedMetrics, func(i, j int) bool { return expectedMetrics[i].Less(expectedMetrics[j]) })
+	for _, m := range expectedMetrics {
+		m.Value = 0
+	}
+	expectedLines := helpers.Format(helpers.WriteMetrics(expectedMetrics))
+
+	// compare both to try to avoid go-difflib bug
+	assert.Equal(t, expectedLines, actualLines)
+	assert.Equal(t, expectedMetrics, actualMetrics)
 }
 
-func TestCollector_Collect(t *testing.T) {
-	c := getCollector(t)
-	ch := make(chan prometheus.Metric)
-	go func() {
-		c.Collect(ch)
-		close(ch)
-	}()
+func TestCollectorDisableBasicMetrics(t *testing.T) {
+	cfg, err := config.Load("../config.tests.yml")
+	require.NoError(t, err)
+	client := client.New()
+	instanceGroups := make(map[bool][]string, 2)
+	for i := range cfg.Instances {
+		// Disable basic metrics in even instances.
+		// This disable instance: no-such-instance.
+		isDisabled := i%2 == 0
+		cfg.Instances[i].DisableBasicMetrics = isDisabled
+		// Groups instance names by disabled or enabled metrics.
+		instanceGroups[isDisabled] = append(instanceGroups[isDisabled], cfg.Instances[i].Instance)
+	}
+	sess, err := sessions.New(cfg.Instances, client.HTTP(), false)
+	require.NoError(t, err)
 
-	const expected = 101
-	metrics := make([]helpers.Metric, 0, expected)
-	for m := range ch {
-		metrics = append(metrics, *helpers.ReadMetric(m))
+	c := New(cfg, sess)
+
+	actualMetrics := helpers.ReadMetrics(helpers.CollectMetrics(c))
+	actualLines := helpers.Format(helpers.WriteMetrics(actualMetrics))
+
+	// Check if all collected metrics do not contain metrics for instance whare disabled metrics.
+	hasMetricForInstance := func(lines []string, instanceName string) bool {
+		for _, line := range lines {
+			if strings.Contains(line, fmt.Sprintf("instance=%q", instanceName)) {
+				return true
+			}
+		}
+		return false
 	}
 
-	assert.Equal(t, expected, len(metrics), "%+v", metrics)
+	// Scans if metrics contain a metric for the disabled instance (DisableBasicMetrics = true).
+	for _, inst := range instanceGroups[true] {
+		assert.Falsef(t, hasMetricForInstance(actualLines, inst), "Found metrics for disabled instance %s", inst)
+	}
+
+	// Scans if metrics contain a metric for the enabled instance (DisableBasicMetrics = false).
+	for _, inst := range instanceGroups[false] {
+		assert.Truef(t, hasMetricForInstance(actualLines, inst), "Did not find metrics for enabled instance %s", inst)
+	}
 }

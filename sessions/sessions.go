@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/prometheus/common/log"
@@ -20,6 +21,8 @@ import (
 type Instance struct {
 	Region                     string
 	Instance                   string
+	DisableBasicMetrics        bool
+	DisableEnhancedMetrics     bool
 	ResourceID                 string
 	Labels                     map[string]string
 	EnhancedMonitoringInterval time.Duration
@@ -52,22 +55,22 @@ func New(instances []config.Instance, client *http.Client, trace bool) (*Session
 		// re-use session for the same region and key (explicit or empty for implicit) pair
 		if s := sharedSessions[instance.Region+"/"+instance.AWSAccessKey]; s != nil {
 			res.sessions[s] = append(res.sessions[s], Instance{
-				Region:   instance.Region,
-				Instance: instance.Instance,
-				Labels:   instance.Labels,
+				Region:                 instance.Region,
+				Instance:               instance.Instance,
+				Labels:                 instance.Labels,
+				DisableBasicMetrics:    instance.DisableBasicMetrics,
+				DisableEnhancedMetrics: instance.DisableEnhancedMetrics,
 			})
 			continue
 		}
 
 		// use given credentials, or default credential chain
 		var creds *credentials.Credentials
-		if instance.AWSAccessKey != "" || instance.AWSSecretKey != "" {
-			creds = credentials.NewCredentials(&credentials.StaticProvider{
-				Value: credentials.Value{
-					AccessKeyID:     instance.AWSAccessKey,
-					SecretAccessKey: instance.AWSSecretKey,
-				},
-			})
+
+		creds, err := buildCredentials(instance)
+
+		if err != nil {
+			return nil, err
 		}
 
 		// make config with careful logging
@@ -96,9 +99,11 @@ func New(instances []config.Instance, client *http.Client, trace bool) (*Session
 		}
 		sharedSessions[instance.Region+"/"+instance.AWSAccessKey] = s
 		res.sessions[s] = append(res.sessions[s], Instance{
-			Region:   instance.Region,
-			Instance: instance.Instance,
-			Labels:   instance.Labels,
+			Region:                 instance.Region,
+			Instance:               instance.Instance,
+			Labels:                 instance.Labels,
+			DisableBasicMetrics:    instance.DisableBasicMetrics,
+			DisableEnhancedMetrics: instance.DisableEnhancedMetrics,
 		})
 	}
 
@@ -170,6 +175,29 @@ func (s *Sessions) GetSession(region, instance string) (*session.Session, *Insta
 				return session, &i
 			}
 		}
+	}
+	return nil, nil
+}
+
+func buildCredentials(instance config.Instance) (*credentials.Credentials, error) {
+	if instance.AWSRoleArn != "" {
+		stsSession, err := session.NewSession(&aws.Config{
+			Region:      aws.String(instance.Region),
+			Credentials: credentials.NewStaticCredentials(instance.AWSAccessKey, instance.AWSSecretKey, ""),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return stscreds.NewCredentials(stsSession, instance.AWSRoleArn), nil
+	}
+	if instance.AWSAccessKey != "" || instance.AWSSecretKey != "" {
+		return credentials.NewCredentials(&credentials.StaticProvider{
+			Value: credentials.Value{
+				AccessKeyID:     instance.AWSAccessKey,
+				SecretAccessKey: instance.AWSSecretKey,
+			},
+		}), nil
 	}
 	return nil, nil
 }
