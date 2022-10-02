@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -191,6 +193,8 @@ func makeGauge(desc *prometheus.Desc, labelValues []string, value reflect.Value)
 		f = value.Float()
 	case reflect.Int, reflect.Int64:
 		f = float64(value.Int())
+	case reflect.String:
+		f, _ = strconv.ParseFloat(value.String(), 64)
 	default:
 		panic(fmt.Errorf("can't make a metric value for %s from %v (%s)", desc, value, kind))
 	}
@@ -474,6 +478,12 @@ func (m *osMetrics) makePrometheusMetrics(region string, labels map[string]strin
 		float64(m.NumVCPUs)),
 	)
 
+	res = append(res, makeGauge(
+		prometheus.NewDesc("rdsosmetrics_uptime", "The amount of time that the DB instance has been active.", nil, constLabels),
+		nil,
+		reflect.ValueOf(parseOSMetricsUptime(m.Uptime)),
+	))
+
 	// always make both generic and node_exporter-like metrics
 
 	metrics := makeGenericMetrics(m.CPUUtilization, "rdsosmetrics_cpuUtilization_", constLabels)
@@ -528,4 +538,19 @@ func (m *osMetrics) makePrometheusMetrics(region string, labels map[string]strin
 	res = append(res, metrics...)
 
 	return res
+}
+
+func parseOSMetricsUptime(uptime string) int {
+	re := regexp.MustCompile("^(\\d+\\s+days\\s*,\\s*)?(\\d+):(\\d+):(\\d+)$")
+	parts := re.FindStringSubmatch(uptime)
+	if len(parts) != 5 {
+		return 0
+	}
+
+	days, _ := strconv.Atoi(strings.Split(parts[1], "days")[0])
+	hours, _ := strconv.Atoi(parts[2])
+	minutes, _ := strconv.Atoi(parts[3])
+	seconds, _ := strconv.Atoi(parts[4])
+
+	return days*24*60*60 + hours*60*60 + minutes*60 + seconds
 }
