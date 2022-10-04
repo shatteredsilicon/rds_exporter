@@ -547,7 +547,7 @@ func parseOSMetricsUptime(uptime string) int {
 		return 0
 	}
 
-	days, _ := strconv.Atoi(strings.Split(parts[1], "days")[0])
+	days, _ := strconv.Atoi(strings.TrimSpace(strings.Split(parts[1], "days")[0]))
 	hours, _ := strconv.Atoi(parts[2])
 	minutes, _ := strconv.Atoi(parts[3])
 	seconds, _ := strconv.Atoi(parts[4])
