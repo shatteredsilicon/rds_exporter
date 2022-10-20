@@ -541,13 +541,13 @@ func (m *osMetrics) makePrometheusMetrics(region string, labels map[string]strin
 }
 
 func parseOSMetricsUptime(uptime string) int {
-	re := regexp.MustCompile("^(\\d+\\s+days\\s*,\\s*)?(\\d+):(\\d+):(\\d+)$")
+	re := regexp.MustCompile("^(\\s*\\d+\\s+days?\\s*,)?\\s*(\\d+):(\\d+):(\\d+)$")
 	parts := re.FindStringSubmatch(uptime)
 	if len(parts) != 5 {
 		return 0
 	}
 
-	days, _ := strconv.Atoi(strings.TrimSpace(strings.Split(parts[1], "days")[0]))
+	days, _ := strconv.Atoi(strings.TrimSpace(strings.Split(parts[1], "day")[0]))
 	hours, _ := strconv.Atoi(parts[2])
 	minutes, _ := strconv.Atoi(parts[3])
 	seconds, _ := strconv.Atoi(parts[4])
