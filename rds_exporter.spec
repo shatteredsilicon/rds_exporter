@@ -41,7 +41,7 @@ ln -s $(pwd) src/%{provider_prefix}
 export GOPATH=$(pwd)
 mkdir -p vendor/github.com/cespare/xxhash/v2
 find vendor/github.com/cespare/xxhash  ! -path '*/v2' -mindepth 1 -maxdepth 1 -exec mv {} vendor/github.com/cespare/xxhash/v2 \;
-GO111MODULE=off go build -ldflags "${LDFLAGS:-} -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n')" -a -v -x %{provider_prefix}
+GO111MODULE=off go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n')" -a -v -x %{provider_prefix}
 
 
 %install
