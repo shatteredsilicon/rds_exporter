@@ -10,7 +10,7 @@
 
 Name:		%{repo}
 Version:	%{_version}
-Release:	1%{?dist}
+Release:	%{_release}
 Summary:	Prometheus exporter for RDS metrics, written in Go with pluggable metric collectors
 
 License:	ASL 2.0
