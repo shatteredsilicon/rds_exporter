@@ -28,7 +28,11 @@ type scraper struct {
 func newScraper(session *session.Session, instances []sessions.Instance) *scraper {
 	logStreamNames := make([]string, 0, len(instances))
 	for _, instance := range instances {
-		logStreamNames = append(logStreamNames, instance.ResourceID)
+		// ignore instances with interval <= 0, because
+		// those are instances with enhanced monitoring disabled
+		if instance.EnhancedMonitoringInterval > 0 {
+			logStreamNames = append(logStreamNames, instance.ResourceID)
+		}
 	}
 
 	return &scraper{
