@@ -11,62 +11,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO    := GO15VENDOREXPERIMENT=1 go
-PROMU := $(GOPATH)/bin/promu
-pkgs   = $(shell $(GO) list ./...)
+BUILDDIR	?= /tmp/ssmbuild
+VERSION		?= 9.4.1
+RELEASE		?= 1
 
-PREFIX                  ?= $(shell pwd)
-BIN_DIR                 ?= $(shell pwd)
-DOCKER_IMAGE_NAME       ?= $(shell basename $(shell pwd))
-DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
+ifeq (0, $(shell hash dpkg 2>/dev/null; echo $$?))
+ARCH	:= $(shell dpkg --print-architecture)
+else
+ARCH	:= $(shell rpm --eval "%{_arch}")
+endif
 
+TARBALL_FILE	:= $(BUILDDIR)/tarballs/rds_exporter-$(VERSION)-$(RELEASE).tar.gz
+SRPM_FILE		:= $(BUILDDIR)/results/SRPMS/rds_exporter-$(VERSION)-$(RELEASE).src.rpm
+RPM_FILE		:= $(BUILDDIR)/results/RPMS/rds_exporter-$(VERSION)-$(RELEASE).$(ARCH).rpm
 
-all: format build test
+.PHONY: all
+all: srpm rpm
 
-style:
-	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+$(TARBALL_FILE):
+	mkdir -vp $(shell dirname $(TARBALL_FILE))
 
-test:
-	@echo ">> running tests"
-	@$(GO) test $(pkgs)
+	GO111MODULE=on go mod vendor
 
-test-race:
-	@echo ">> running tests"
-	@$(GO) test -v -race $(pkgs)
+	tar -czf $(TARBALL_FILE) -C $(shell dirname $(CURDIR)) --transform s/$(shell basename $(CURDIR))/rds_exporter/ $(shell basename $(CURDIR))
 
-format:
-	@echo ">> formatting code"
-	@$(GO) fmt $(pkgs)
+.PHONY: srpm
+srpm: $(SRPM_FILE)
 
-vet:
-	@echo ">> vetting code"
-	@$(GO) vet $(pkgs)
+$(SRPM_FILE): $(TARBALL_FILE)
+	mkdir -vp $(BUILDDIR)/rpmbuild/{SOURCES,SPECS,BUILD,SRPMS,RPMS}
+	mkdir -vp $(shell dirname $(SRPM_FILE))
 
-build: promu
-	@echo ">> building binaries"
-	@$(PROMU) build --prefix $(PREFIX)
+	cp rds_exporter.spec $(BUILDDIR)/rpmbuild/SPECS/rds_exporter.spec
+	sed -i "s/%{_version}/$(VERSION)/g" "$(BUILDDIR)/rpmbuild/SPECS/rds_exporter.spec"
+	sed -i "s/%{_release}/$(RELEASE)/g" "$(BUILDDIR)/rpmbuild/SPECS/rds_exporter.spec"
+	cp $(TARBALL_FILE) $(BUILDDIR)/rpmbuild/SOURCES/
+	rpmbuild -bs --define "debug_package %{nil}" --define "_topdir $(BUILDDIR)/rpmbuild" $(BUILDDIR)/rpmbuild/SPECS/rds_exporter.spec
+	mv $(BUILDDIR)/rpmbuild/SRPMS/$(shell basename $(SRPM_FILE)) $(SRPM_FILE)
 
-tarball: promu
-	@echo ">> building release tarball"
-	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
+.PHONY: rpm
+rpm: $(RPM_FILE)
 
-docker:
-	@echo ">> building docker image $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)"
-	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
+$(RPM_FILE): $(SRPM_FILE)
+	mkdir -vp $(BUILDDIR)/mock $(shell dirname $(RPM_FILE))
+	mock -r ssm-9-$$(rpm --eval "%{_arch}") --resultdir $(BUILDDIR)/mock --rebuild $(SRPM_FILE)
+	mv $(BUILDDIR)/mock/$(shell basename $(RPM_FILE)) $(RPM_FILE)
 
-promu:
-	@GOOS=$(shell uname -s | tr A-Z a-z) \
-	        GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
-	        $(GO) get -u github.com/prometheus/promu
-
-travis: build test-race codecov tarball docker
-
-codecov: gocoverutil
-	@gocoverutil -coverprofile=coverage.txt test $(pkgs)
-	@curl -s https://codecov.io/bash | bash -s - -X fix
-
-gocoverutil:
-	@$(GO) get -u github.com/AlekSi/gocoverutil
-
-.PHONY: all style format build test vet tarball docker promu
+.PHONY: clean
+clean:
+	rm -rf $(BUILDDIR)/*
