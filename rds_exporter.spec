@@ -15,7 +15,7 @@ Summary:	Prometheus exporter for RDS metrics, written in Go with pluggable metri
 
 License:	ASL 2.0
 URL:		https://%{provider_prefix}
-Source0:	%{repo}-%{version}.tar.gz
+Source0:	%{repo}-%{version}-%{release}.tar.gz
 
 BuildRequires:	golang
 
