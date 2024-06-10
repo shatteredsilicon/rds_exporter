@@ -19,11 +19,12 @@ ifeq (0, $(shell hash dpkg 2>/dev/null; echo $$?))
 ARCH	:= $(shell dpkg --print-architecture)
 else
 ARCH	:= $(shell rpm --eval "%{_arch}")
+DIST	:= $(shell rpmspec --eval "%{?dist}")
 endif
 
 TARBALL_FILE	:= $(BUILDDIR)/tarballs/rds_exporter-$(VERSION)-$(RELEASE).tar.gz
-SRPM_FILE		:= $(BUILDDIR)/results/SRPMS/rds_exporter-$(VERSION)-$(RELEASE).src.rpm
-RPM_FILE		:= $(BUILDDIR)/results/RPMS/rds_exporter-$(VERSION)-$(RELEASE).$(ARCH).rpm
+SRPM_FILE		:= $(BUILDDIR)/results/SRPMS/rds_exporter-$(VERSION)-$(RELEASE)$(DIST).src.rpm
+RPM_FILE		:= $(BUILDDIR)/results/RPMS/rds_exporter-$(VERSION)-$(RELEASE)$(DIST).$(ARCH).rpm
 
 .PHONY: all
 all: srpm rpm
