@@ -35,7 +35,8 @@ func NewCollector(sessions *sessions.Sessions) *Collector {
 	}
 
 	for session, instances := range sessions.AllSessions() {
-		s := newScraper(session, instances)
+		cfg := sessions.Configs[session]
+		s := newScraper(cfg, instances)
 
 		interval := maxInterval
 		for _, instance := range instances {
