@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 
@@ -18,14 +17,14 @@ import (
 type scraper struct {
 	instances      []sessions.Instance
 	logStreamNames []string
-	svc            *cloudwatchlogs.CloudWatchLogs
+	svc            *cloudwatchlogs.Client
 	nextStartTime  time.Time
 	logger         log.Logger
 
 	testDisallowUnknownFields bool // for tests only
 }
 
-func newScraper(session *session.Session, instances []sessions.Instance) *scraper {
+func newScraper(cfg aws.Config, instances []sessions.Instance) *scraper {
 	logStreamNames := make([]string, 0, len(instances))
 	for _, instance := range instances {
 		// ignore instances with interval <= 0, because
@@ -38,7 +37,7 @@ func newScraper(session *session.Session, instances []sessions.Instance) *scrape
 	return &scraper{
 		instances:      instances,
 		logStreamNames: logStreamNames,
-		svc:            cloudwatchlogs.New(session),
+		svc:            cloudwatchlogs.NewFromConfig(cfg),
 		nextStartTime:  time.Now().Add(-3 * time.Minute).Round(0), // strip monotonic clock reading
 		logger:         log.With("component", "enhanced"),
 	}
@@ -82,51 +81,56 @@ func (s *scraper) scrape(ctx context.Context) (map[string][]prometheus.Metric, m
 
 		input := &cloudwatchlogs.FilterLogEventsInput{
 			LogGroupName:   aws.String("RDSOSMetrics"),
-			LogStreamNames: aws.StringSlice(s.logStreamNames[sliceStart:sliceEnd]),
-			StartTime:      aws.Int64(aws.TimeUnixMilli(s.nextStartTime)),
+			LogStreamNames: s.logStreamNames[sliceStart:sliceEnd],
+			StartTime:      aws.Int64(s.nextStartTime.UnixMilli()),
 		}
 
 		s.logger.With("next_start", s.nextStartTime.UTC()).With("since_last", time.Since(s.nextStartTime)).Debugf("Requesting metrics")
 
-		// collect all returned events and metrics/messages
-		collectAllMetrics := func(output *cloudwatchlogs.FilterLogEventsOutput, lastPage bool) bool {
+		paginator := cloudwatchlogs.NewFilterLogEventsPaginator(s.svc, input)
+		for paginator.HasMorePages() {
+			output, err := paginator.NextPage(ctx)
+			if err != nil {
+				s.logger.With("error", err).Error("Failed to filter log events.")
+				break
+			}
 			for _, event := range output.Events {
-				l := s.logger.With("EventId", *event.EventId).With("LogStreamName", *event.LogStreamName)
-				l = l.With("Timestamp", aws.MillisecondsTimeValue(event.Timestamp).UTC())
-				l = l.With("IngestionTime", aws.MillisecondsTimeValue(event.IngestionTime).UTC())
+				l := s.logger.
+					With("EventId", aws.ToString(event.EventId)).
+					With("LogStreamName", aws.ToString(event.LogStreamName)).
+					With("Timestamp", time.UnixMilli(aws.ToInt64(event.Timestamp)).UTC()).
+					With("IngestionTime", time.UnixMilli(aws.ToInt64(event.IngestionTime)).UTC())
 
 				var instance *sessions.Instance
 				for _, i := range s.instances {
-					if i.ResourceID == *event.LogStreamName {
+					if i.ResourceID == aws.ToString(event.LogStreamName) {
 						instance = &i
 						break
 					}
 				}
 				if instance == nil {
-					l.Errorf("Failed to find instance.")
+					l.Error("Failed to find instance.")
 					continue
 				}
 
 				if instance.DisableEnhancedMetrics {
-					l.Debugf("Enhanced Metrics are dissabled for instance %v.", instance)
+					l.Debugf("Enhanced Metrics are disabled for instance %v.", instance)
 					continue
 				}
 				l = l.With("region", instance.Region).With("instance", instance.Instance)
 
-				// l.Debugf("Message:\n%s", *event.Message)
-				osMetrics, err := parseOSMetrics([]byte(*event.Message), s.testDisallowUnknownFields)
+				osMetrics, err := parseOSMetrics([]byte(aws.ToString(event.Message)), s.testDisallowUnknownFields)
 				if err != nil {
 					// only for tests
 					if s.testDisallowUnknownFields {
 						panic(fmt.Sprintf("New metrics should be added: %s", err))
 					}
 
-					l.Errorf("Failed to parse metrics: %s.", err)
+					l.With("error", err).Error("Failed to parse metrics.")
 					continue
 				}
-				// l.Debugf("OS Metrics:\n%#v", osMetrics)
 
-				timestamp := aws.MillisecondsTimeValue(event.Timestamp).UTC()
+				timestamp := time.UnixMilli(aws.ToInt64(event.Timestamp)).UTC()
 				l.Debugf("Timestamp from message: %s; from event: %s.", osMetrics.Timestamp.UTC(), timestamp)
 
 				if allMetrics[instance.ResourceID] == nil {
@@ -137,13 +141,8 @@ func (s *scraper) scrape(ctx context.Context) (map[string][]prometheus.Metric, m
 				if allMessages[instance.ResourceID] == nil {
 					allMessages[instance.ResourceID] = make(map[time.Time]string)
 				}
-				allMessages[instance.ResourceID][timestamp] = *event.Message
+				allMessages[instance.ResourceID][timestamp] = aws.ToString(event.Message)
 			}
-
-			return true // continue pagination
-		}
-		if err := s.svc.FilterLogEventsPagesWithContext(ctx, input, collectAllMetrics); err != nil {
-			s.logger.Errorf("Failed to filter log events: %s.", err)
 		}
 	}
 	// get better times
