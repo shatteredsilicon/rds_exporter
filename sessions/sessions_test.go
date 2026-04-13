@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -85,7 +84,7 @@ func TestSession(t *testing.T) {
 	assert.Nil(t, ni)
 
 	all := sessions.AllSessions()
-	assert.Equal(t, map[*session.Session][]Instance{
+	assert.Equal(t, map[string][]Instance{
 		am56s: {am56iExpected},
 		p10s:  {p10iExpected},
 		m57s:  {m57iExpected, ap11iExpected},
