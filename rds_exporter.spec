@@ -33,25 +33,20 @@ See the PMM docs for more information.
 
 %prep
 %setup -q -n %{name}
-mkdir -p src/%{provider}.%{provider_tld}/%{project}
-ln -s $(pwd) src/%{provider_prefix}
 
 
 %build
-export GOPATH=$(pwd)
-mkdir -p vendor/github.com/cespare/xxhash/v2
-find vendor/github.com/cespare/xxhash  ! -path '*/v2' -mindepth 1 -maxdepth 1 -exec mv {} vendor/github.com/cespare/xxhash/v2 \;
-GO111MODULE=off go install -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n')" -a -v -x %{provider_prefix}
+GOTOOLCHAIN=local go build -ldflags "${LDFLAGS:-} -s -w -B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n')" -a -v -x .
 
 
 %install
 install -d -p %{buildroot}%{_sbindir}
-install -p -m 0755 ./bin/%{repo} %{buildroot}%{_sbindir}/%{repo}
+install -p -m 0755 ./%{repo} %{buildroot}%{_sbindir}/%{repo}
 
 
 %files
-%license src/%{provider_prefix}/LICENSE
-%doc src/%{provider_prefix}/README.md
+%license LICENSE
+%doc README.md
 %{_sbindir}/%{name}
 
 

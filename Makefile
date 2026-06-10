@@ -32,7 +32,7 @@ all: srpm rpm
 $(TARBALL_FILE):
 	mkdir -vp $(shell dirname $(TARBALL_FILE))
 
-	GOTOOLCHAIN=auto GO111MODULE=on go mod vendor
+	GOTOOLCHAIN=local GO111MODULE=on go mod vendor
 
 	tar --exclude-vcs -czf $(TARBALL_FILE) -C $(shell dirname $(CURDIR)) --transform s/^$(shell basename $(CURDIR))/rds_exporter/ $(shell basename $(CURDIR))
 
