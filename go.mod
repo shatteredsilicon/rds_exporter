@@ -1,6 +1,6 @@
 module github.com/shatteredsilicon/rds_exporter
 
-go 1.25.11
+go 1.26.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.5
