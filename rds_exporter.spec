@@ -17,7 +17,7 @@ License:	ASL 2.0
 URL:		https://%{provider_prefix}
 Source0:	%{repo}-%{version}-%{_release}.tar.gz
 
-BuildRequires:	golang
+BuildRequires:	golang >= 1.27.3
 
 %if 0%{?fedora} || 0%{?rhel} == 7
 BuildRequires: systemd
